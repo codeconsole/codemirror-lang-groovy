@@ -1,6 +1,6 @@
 {
   "name": "codemirror-lang-groovy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Groovy language support for CodeMirror 6, built on a Lezer grammar",
   "keywords": [
     "codemirror",
@@ -42,6 +42,7 @@
     "build": "lezer-generator src/groovy.grammar -o src/parser.js && rollup -c && node scripts/copy-types.js",
     "build-debug": "lezer-generator src/groovy.grammar --names -o src/parser.js && rollup -c && node scripts/copy-types.js",
     "prepare": "npm run build",
+    "prepublishOnly": "npm test",
     "test": "mocha test/test-*.js",
     "corpus": "node scripts/corpus.js"
   },
