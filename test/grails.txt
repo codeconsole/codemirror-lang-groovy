@@ -1,0 +1,69 @@
+# A domain class
+
+class Book {
+  String title
+  Author author
+  static belongsTo = [author: Author]
+  static hasMany = [chapters: Chapter]
+  static mapping = {
+    table 'books'
+    title column: 'book_title'
+  }
+}
+
+==>
+
+Program(ClassDeclaration(class,Definition,ClassBody(FieldDeclaration(TypeName,VariableDeclarator(Definition)),FieldDeclaration(TypeName,VariableDeclarator(Definition)),FieldDeclaration(Modifiers(static),VariableDeclarator(Definition,AssignOp,MapExpression(MapEntry(PropertyName,Identifier)))),FieldDeclaration(Modifiers(static),VariableDeclarator(Definition,AssignOp,MapExpression(MapEntry(PropertyName,Identifier)))),FieldDeclaration(Modifiers(static),VariableDeclarator(Definition,AssignOp,Closure(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(StringLiteral))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(NamedArgument(PropertyName,StringLiteral))))))))))
+
+
+# URL mappings
+
+class UrlMappings {
+  static mappings = {
+    "/$controller/$action?/$id?(.$format)?" {
+      constraints { }
+    }
+    "/"(view: "/index")
+    "500"(view: '/error')
+    '/books'(resources: 'book')
+  }
+}
+
+==>
+
+Program(ClassDeclaration(class,Definition,ClassBody(FieldDeclaration(Modifiers(static),VariableDeclarator(Definition,AssignOp,Closure(ExpressionStatement(MethodInvocation(GString(InterpolatedVariable,InterpolatedVariable,InterpolatedVariable,InterpolatedVariable),Closure(ExpressionStatement(MethodInvocation(MethodName(Identifier),Closure))))),ExpressionStatement(MethodInvocation(GString,ArgumentList(NamedArgument(PropertyName,GString)))),ExpressionStatement(MethodInvocation(GString,ArgumentList(NamedArgument(PropertyName,StringLiteral)))),ExpressionStatement(MethodInvocation(StringLiteral,ArgumentList(NamedArgument(PropertyName,StringLiteral))))))))))
+
+
+# A controller action
+
+def show(Long id) {
+  def book = Book.get(id)
+  if (!book) {
+    render status: 404
+    return
+  }
+  respond book, model: [count: Book.count()]
+}
+
+==>
+
+Program(MethodDeclaration(def,Definition,FormalParameters(FormalParameter(TypeName,Definition)),Block(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MethodInvocation(Identifier,MethodName(Identifier),ArgumentList(Identifier)))),IfStatement(if,ParenthesizedExpression(UnaryExpression(LogicOp,Identifier)),Block(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(NamedArgument(PropertyName,IntegerLiteral)))),ReturnStatement(return))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier,NamedArgument(PropertyName,MapExpression(MapEntry(PropertyName,MethodInvocation(Identifier,MethodName(Identifier),ArgumentList))))))))))
+
+
+# A Gradle build script
+
+plugins {
+  id 'groovy'
+  id 'org.example.plugin' version '1.0' apply false
+}
+dependencies {
+  implementation platform("org.apache.grails:grails-bom:$grailsVersion")
+  testImplementation 'org.spockframework:spock-core'
+}
+tasks.withType(GroovyCompile).configureEach {
+  options.encoding = 'UTF-8'
+}
+
+==>
+
+Program(ExpressionStatement(MethodInvocation(MethodName(Identifier),Closure(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(StringLiteral))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(StringLiteral),CommandChain(MethodName(Identifier),CommandArguments(StringLiteral)),CommandChain(MethodName(Identifier),CommandArguments(BooleanLiteral))))))),ExpressionStatement(MethodInvocation(MethodName(Identifier),Closure(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(MethodInvocation(MethodName(Identifier),ArgumentList(GString(InterpolatedVariable)))))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(StringLiteral)))))),ExpressionStatement(MethodInvocation(MethodInvocation(Identifier,MethodName(Identifier),ArgumentList(Identifier)),MethodName(Identifier),Closure(ExpressionStatement(AssignmentExpression(FieldAccess(Identifier,PropertyName),AssignOp,StringLiteral))))))

@@ -1,0 +1,1133 @@
+// Groovy grammar for Lezer.
+//
+// Derived from the Java grammar in @lezer/java (MIT, Copyright (C) 2020 by
+// Marijn Haverbeke and others), extended with the parts of Groovy's syntax
+// that Java lacks: newline-terminated statements, parenthesis-free command
+// calls, closures, GStrings and the slashy string forms, list and map
+// literals, named arguments, and Groovy's additional operators.
+//
+// The reference for Groovy's syntax is the Parrot parser's ANTLR grammar in
+// apache/groovy (src/antlr/GroovyParser.g4 and GroovyLexer.g4).
+
+@precedence {
+  update @left
+  negate @left
+  power @left
+  unaryPlus @left
+  cast
+  times @left
+  plus @left
+  shift @left
+  relational @left
+  equality @left
+  bitAnd @left
+  bitXor @left
+  bitOr @left
+  and @left
+  or @left
+  ternary @right
+  valuePair
+  assign @right
+  array @right
+  new @right
+  else @right
+  scope @left
+  typeArgs
+}
+
+@top Program {
+  scriptStatement*
+}
+
+// A script may declare methods at the top level, next to its statements.
+scriptStatement {
+  statement |
+  scriptMethodDeclaration
+}
+
+scriptMethodDeclaration[@name=MethodDeclaration] {
+  Modifiers? methodHeader Block |
+  Modifiers TypeParameters? methodDeclarator Throws? Block
+}
+
+literal {
+  IntegerLiteral |
+  FloatingPointLiteral |
+  booleanLiteral |
+  StringLiteral |
+  GString |
+  SlashyString |
+  DollarSlashyString |
+  kw<"null">
+}
+
+@skip {} {
+  GString[isolate] {
+    gstringStart (gstringContent | gstringEscape | gstringVariable | gstringInterpolation)* (gstringEnd | gstringLineEnd) |
+    tripleGStringStart (tripleGStringContent | tripleGStringEscape | tripleGStringVariable | tripleGStringInterpolation)* tripleGStringEnd
+  }
+
+  SlashyString[isolate] {
+    slashyStart (slashyContent | slashyEscape | slashyVariable | slashyInterpolation)* slashyEnd
+  }
+
+  DollarSlashyString[isolate] {
+    dollarSlashyStart (dollarSlashyContent | dollarSlashyEscape | dollarSlashyVariable | dollarSlashyInterpolation)* dollarSlashyEnd
+  }
+}
+
+// `${...}` holds a closure body: usually one expression, sometimes
+// declarations, as in GORM's `@Query("from ${Book b} where b.title = $t")`,
+// and evaluated lazily in `${-> ...}`.
+interpolation[@name=Interpolation,isolate]<start> {
+  start "->"? statement* InterpolationEnd
+}
+
+gstringInterpolation { interpolation<gstringInterpolationStart> }
+tripleGStringInterpolation { interpolation<tripleGStringInterpolationStart> }
+slashyInterpolation { interpolation<slashyInterpolationStart> }
+dollarSlashyInterpolation { interpolation<dollarSlashyInterpolationStart> }
+
+expression[@isGroup=Expression] {
+  LambdaExpression |
+  assignmentExpression
+}
+
+assignmentExpression[@inline] {
+  conditionalExpression |
+  AssignmentExpression
+}
+
+conditionalExpression {
+  BinaryExpression |
+  InstanceofExpression |
+  AsExpression |
+  RangeExpression |
+  TernaryExpression |
+  ElvisExpression |
+  UpdateExpression |
+  baseExpression |
+  UnaryExpression |
+  CastExpression
+}
+
+CastExpression {
+  "(" type ("&" type)* ")" !cast expression
+}
+
+AssignmentExpression {
+  leftHandSide !assign (AssignOp | "=") expression
+}
+
+// At statement level, a command call may stand on the right of an
+// assignment: `total = sum 1, 2`.
+commandAssignment[@name=AssignmentExpression] {
+  leftHandSide !assign (AssignOp | "=") CommandExpression
+}
+
+leftHandSide {
+  expression
+}
+
+BinaryExpression {
+  expression !equality op<Compare, "==" | "!=" | "===" | "!==" | "<=>" | "=~" | "==~"> expression |
+  expression !relational (op<Compare, ">=" | "<="> | CompareOp { "<" | ">" }) expression |
+  expression !relational op<Logic, "!">? ckw<"in"> expression |
+  expression !and op<Logic, "&&"> expression |
+  expression !or op<Logic, "||"> expression |
+  expression !bitAnd BitOp { "&" } expression |
+  expression !bitOr op<Bit, "|"> expression |
+  expression !bitXor op<Bit, "^"> expression |
+  expression !plus op<Arith, "+" | "-"> expression |
+  expression !times times expression |
+  expression !power op<Arith, "**"> expression |
+  expression !shift (op<Bit, "<<"> | shiftOp) expression
+}
+
+RangeExpression {
+  expression !shift (".." | "..<" | "<.." | "<..<") expression
+}
+
+InstanceofExpression {
+  expression !relational op<Logic, "!">? kw<"instanceof"> (TypePattern | type)
+}
+
+// `x instanceof Promise promise` binds the matched value.
+TypePattern {
+  Modifiers? unannotatedType Definition
+}
+
+AsExpression {
+  expression !relational ckw<"as"> type
+}
+
+LambdaExpression {
+  (Definition ~arrow | FormalParameters) "->" (expression | Block)
+}
+
+TernaryExpression {
+  expression !ternary op<Logic, "?"> expression ":" expression
+}
+
+ElvisExpression {
+  expression !ternary op<Logic, "?:"> expression
+}
+
+UnaryExpression {
+  op<Arith, "+" | "-"> !unaryPlus expression |
+  (op<Logic, "!"> | op<Bit, "~">) !negate expression
+}
+
+UpdateExpression {
+  expression !update op<Update, "--" | "++"> |
+  op<Update, "--" | "++"> !update expression
+}
+
+baseExpression {
+  literal |
+  ClassLiteral |
+  kw<"this"> |
+  Identifier ~identifier |
+  ParenthesizedExpression |
+  ObjectCreationExpression |
+  FieldAccess |
+  ArrayAccess |
+  MethodInvocation |
+  MethodReference |
+  ArrayCreationExpression |
+  Closure |
+  ListExpression |
+  MapExpression |
+  SwitchExpression |
+  typeValue
+}
+
+// `def size = switch (n) { case 0 -> 'none'; default -> 'some' }`. At the
+// start of a statement, `switch` begins a statement instead.
+SwitchExpression {
+  kw<"switch"> ParenthesizedExpression SwitchBlock
+}
+
+// A type standing as a value names its class: `getMethod('size', int)`,
+// `getBean(name, MimeType[])`, `@Scaffold(RestfulServiceController<Book>)`.
+typeValue[@name=ClassLiteral] {
+  primitiveType ~typeValue |
+  ArrayType ~typeValue |
+  GenericType ~typeValue
+}
+
+ArrayCreationExpression {
+  kw<"new"> annotation* simpleType
+  Dimension { annotation* !array "[" expression? "]" }+
+  ArrayInitializer?
+}
+
+ArrayInitializer {
+  "{" commaSepTrailing<expression> "}"
+}
+
+ParenthesizedExpression {
+  "(" expression ")"
+}
+
+ClassLiteral {
+  unannotatedType "." kw<"class">
+}
+
+ObjectCreationExpression {
+  unqualifiedObjectCreationExpression |
+  baseExpression "." unqualifiedObjectCreationExpression
+}
+
+unqualifiedObjectCreationExpression {
+  kw<"new"> TypeArguments? annotation* simpleType !new ArgumentList ClassBody?
+}
+
+// `.`, safe navigation `?.`, spread `*.` and direct field access `.@`.
+memberOp {
+  "." | "?." | "*." | ".@"
+}
+
+// `Trait.super.name` reaches a trait's implementation.
+superTarget {
+  kw<"super"> |
+  baseExpression memberOp kw<"super">
+}
+
+FieldAccess {
+  (baseExpression | superTarget) memberOp memberName
+}
+
+// Groovy allows a quoted member name, as in `map.'some-key'`, or a dynamic
+// one, as in `obj."$name"`.
+memberName {
+  PropertyName |
+  kw<"this"> |
+  kw<"class"> |
+  StringLiteral |
+  GString
+}
+
+// After a dot, Groovy reads a keyword as a plain name: `System.in`,
+// `service.package.name`, `map.byte(0)`.
+memberKeyword {
+  kw<"def"> | kw<"default"> | kw<"package"> | kw<"import"> | kw<"interface"> |
+  kw<"enum"> | kw<"extends"> | kw<"implements"> | kw<"if"> | kw<"else"> | kw<"for"> |
+  kw<"while"> | kw<"do"> | kw<"switch"> | kw<"case"> | kw<"try"> | kw<"catch"> | kw<"finally"> |
+  kw<"throw"> | kw<"throws"> | kw<"return"> | kw<"break"> | kw<"continue"> | kw<"assert"> |
+  kw<"static"> | kw<"final"> | kw<"abstract"> | kw<"public"> | kw<"private"> | kw<"protected"> |
+  kw<"synchronized"> | kw<"native"> | kw<"transient"> | kw<"volatile"> | kw<"strictfp"> |
+  kw<"void"> | kw<"instanceof"> | kw<"null"> | primitiveType | booleanLiteral
+}
+
+ArrayAccess {
+  baseExpression "[" commaSep1<expression> "]"
+}
+
+MethodName { Identifier ~commandIndex }
+
+memberMethodName[@name=MethodName] { Identifier | memberKeyword ~memberKeyword }
+
+// A call may end in one or more closures, which are passed as its last
+// arguments: `list.each { ... }`, `foo(1) { ... }`. Its name may be a string,
+// as in URL mappings, `"/books"(controller: 'book')`, or after a dot,
+// `obj."$name"()`.
+MethodInvocation {
+  (MethodName | StringLiteral | GString |
+   (baseExpression | superTarget) memberOp TypeArguments? (memberMethodName | StringLiteral | GString))
+  (ArgumentList Closure* | Closure+) |
+  Closure ArgumentList
+}
+
+ArgumentList {
+  "(" (argument ("," argument)* ","?)? ")"
+}
+
+argument {
+  expression |
+  NamedArgument |
+  SpreadArgument |
+  SpreadMapArgument
+}
+
+NamedArgument {
+  mapKey ":" expression
+}
+
+SpreadArgument {
+  Asterisk expression
+}
+
+SpreadMapArgument {
+  "*:" expression
+}
+
+mapKey {
+  PropertyName |
+  StringLiteral |
+  GString |
+  IntegerLiteral |
+  FloatingPointLiteral |
+  ParenthesizedExpression |
+  classKey
+}
+
+classKey[@name=PropertyName] { kw<"class"> }
+
+// A call without parentheses, such as `println x` or
+// `name nullable: false`. The `commandStart` token is emitted by an external
+// tokenizer only where Groovy itself would parse a command call, which keeps
+// `String name` a declaration.
+CommandExpression {
+  commandStart commandCallee CommandArguments CommandChain* PropertyName?
+}
+
+// Groovy reads `a b c d` as `a(b).c(d)` and `a b c` as `a(b).c`, as in
+// Gradle's `id 'org.example' version '1.0' apply false`. A link costs
+// dynamic precedence so that `foo x in list` keeps `in` as an operator.
+CommandChain[@dynamicPrecedence=-1] {
+  MethodName CommandArguments
+}
+
+commandCallee {
+  MethodName ~commandParen |
+  commandTarget memberOp memberMethodName ~commandParen |
+  StringLiteral |
+  GString
+}
+
+// The callee may be reached through properties and calls:
+// `e.message.normalize().contains "text"`.
+commandTarget {
+  Identifier ~commandIndex |
+  kw<"this"> |
+  kw<"super"> |
+  commandFieldAccess |
+  commandMethodInvocation |
+  commandArrayAccess |
+  commandObjectCreation |
+  ParenthesizedExpression
+}
+
+commandObjectCreation[@name=ObjectCreationExpression] {
+  unqualifiedObjectCreationExpression
+}
+
+commandArrayAccess[@name=ArrayAccess] {
+  commandTarget "[" commaSep1<expression> "]"
+}
+
+commandFieldAccess[@name=FieldAccess] {
+  commandTarget memberOp PropertyName
+}
+
+commandMethodInvocation[@name=MethodInvocation] {
+  (MethodName | commandTarget memberOp memberMethodName) ~commandParen ArgumentList
+}
+
+CommandArguments {
+  commaSep1<argument>
+}
+
+MethodReference {
+  (type | baseExpression | kw<"super">) ("::" | ".&") TypeArguments? (kw<"new"> | Identifier)
+}
+
+Closure {
+  "{" (ClosureParameters? "->")? statement* "}"
+}
+
+ClosureParameters[@dynamicPrecedence=1] {
+  commaSep1<FormalParameter | SpreadParameter>
+}
+
+ListExpression {
+  "[" (listElement ("," listElement)* ","?)? "]"
+}
+
+listElement {
+  expression |
+  SpreadArgument |
+  annotation
+}
+
+MapExpression {
+  "[" ":" "]" |
+  "[" mapElement ("," mapElement)* ","? "]"
+}
+
+mapElement {
+  MapEntry |
+  SpreadMapArgument
+}
+
+MapEntry {
+  mapKey ":" expression
+}
+
+TypeArguments {
+  "<" commaSep<type | Wildcard> ">"
+}
+
+Wildcard {
+  annotation* "?" wildcardBounds?
+}
+
+wildcardBounds {
+  kw<"extends"> type |
+  kw<"super"> type
+}
+
+Dimension {
+  annotation* !array "[" "]"
+}
+
+statement[@isGroup=Statement] {
+  declaration |
+  ExpressionStatement |
+  LabeledStatement |
+  IfStatement |
+  WhileStatement |
+  ForStatement |
+  EnhancedForStatement |
+  Block |
+  ";" |
+  AssertStatement |
+  SwitchStatement |
+  DoStatement |
+  BreakStatement |
+  ContinueStatement |
+  ReturnStatement |
+  SynchronizedStatement |
+  LocalVariableDeclaration |
+  ThrowStatement |
+  TryStatement |
+  TryWithResourcesStatement
+}
+
+// A statement ends at a semicolon, or at a line break, a closing brace or the
+// end of the input, where the `insertSemi` tokenizer supplies one.
+semi { ";" | insertSemi }
+
+// Where a statement can start, `{` opens a block, as in Groovy; elsewhere it
+// opens a closure. The `blockOpen` tokenizer tells the two apart.
+Block {
+  blockOpen statement* "}"
+}
+
+ExpressionStatement {
+  (expression | CommandExpression | commandAssignment) semi
+}
+
+LabeledStatement {
+  Label ":" statement
+}
+
+Label { identifier | capitalIdentifier }
+
+AssertStatement {
+  kw<"assert"> expression ((":" | ",") expression)? semi
+}
+
+SwitchStatement {
+  statementSwitch ParenthesizedExpression SwitchBlock
+}
+
+SwitchBlock {
+  "{" (SwitchRule | SwitchLabel ":" | statement)* "}"
+}
+
+SwitchLabel {
+  kw<"case"> commaSep1<expression> |
+  kw<"default">
+}
+
+SwitchRule {
+  SwitchLabel "->" (ExpressionStatement | ThrowStatement | Block)
+}
+
+DoStatement {
+  kw<"do"> statement kw<"while"> ParenthesizedExpression semi
+}
+
+BreakStatement {
+  kw<"break"> Label? semi
+}
+
+ContinueStatement {
+  kw<"continue"> Label? semi
+}
+
+ReturnStatement {
+  kw<"return"> expression? semi
+}
+
+SynchronizedStatement {
+  kw<"synchronized"> ParenthesizedExpression Block
+}
+
+ThrowStatement {
+  kw<"throw"> expression semi
+}
+
+TryStatement {
+  kw<"try"> Block CatchClause* FinallyClause?
+}
+
+CatchClause {
+  !else kw<"catch"> CatchFormalParameter Block
+}
+
+// The exception type is optional: `catch (e)`.
+CatchFormalParameter {
+  "(" Modifiers? CatchType? variableDeclaratorId ")"
+}
+
+CatchType {
+  unannotatedType ("|" annotation* unannotatedType)*
+}
+
+FinallyClause {
+  kw<"finally"> Block
+}
+
+TryWithResourcesStatement {
+  kw<"try"> ResourceSpecification Block CatchClause* FinallyClause?
+}
+
+ResourceSpecification {
+  "(" Resource (";" Resource)* ";"? ")"
+}
+
+Resource {
+  Modifiers? unannotatedType? variableDeclaratorId "=" expression |
+  Identifier |
+  FieldAccess
+}
+
+IfStatement {
+  kw<"if"> ParenthesizedExpression statement (!else kw<"else"> statement)?
+}
+
+WhileStatement {
+  kw<"while"> ParenthesizedExpression statement
+}
+
+ForStatement {
+  kw<"for">
+  ForSpec {
+    "(" (LocalVariableDeclaration | commaSep<expression> ";") expression? ";" commaSep<expression> ")"
+  }
+  statement
+}
+
+// `for (x in list)`, `for (String s : list)`; the variable's type is
+// optional.
+EnhancedForStatement {
+  kw<"for">
+  ForSpec {
+    "(" Modifiers? unannotatedType? variableDeclaratorId (":" | ckw<"in">) expression ")"
+  }
+  statement
+}
+
+annotation {
+  MarkerAnnotation |
+  Annotation
+}
+
+MarkerAnnotation {
+  "@" name
+}
+
+Annotation {
+  "@" name AnnotationArgumentList
+}
+
+AnnotationArgumentList {
+  "(" (elementValue | commaSep<ElementValuePair>) ")"
+}
+
+ElementValuePair {
+  Identifier !valuePair "=" elementValue
+}
+
+// Groovy writes annotation arrays as lists, `@A(['x', 'y'])`; a braced value
+// is a closure, as in `@Requires({ ... })`.
+elementValue {
+  (expression | annotation) !valuePair
+}
+
+declaration {
+  PackageDeclaration |
+  ImportDeclaration |
+  ClassDeclaration |
+  RecordDeclaration |
+  InterfaceDeclaration |
+  TraitDeclaration |
+  AnnotationTypeDeclaration |
+  EnumDeclaration
+}
+
+PackageDeclaration {
+  annotation* kw<"package"> name semi
+}
+
+ImportDeclaration {
+  annotation* kw<"import"> kw<"static">? name ("." Asterisk | ckw<"as"> Definition)? semi
+}
+
+EnumDeclaration {
+  Modifiers? kw<"enum"> Definition SuperInterfaces? EnumBody
+}
+
+EnumBody {
+  "{" commaSepTrailing<EnumConstant> (semi classBodyDeclaration*)? "}"
+}
+
+EnumConstant {
+  Modifiers? Definition ArgumentList? ClassBody?
+}
+
+ClassDeclaration {
+  Modifiers? kw<"class"> Definition TypeParameters? Superclass? SuperInterfaces? Permits? ClassBody
+}
+
+TraitDeclaration {
+  Modifiers? ckw<"trait"> Definition TypeParameters? Superclass? SuperInterfaces? ClassBody
+}
+
+Modifiers {
+  annotation+ (modifier annotation*)* ~annotations |
+  (modifier annotation*)+ ~annotations
+}
+
+modifier {
+  kw<"public"> | kw<"protected"> | kw<"private"> | kw<"abstract"> | kw<"static"> | kw<"final"> | kw<"strictfp"> |
+  kw<"default"> | kw<"synchronized"> | kw<"native"> | kw<"transient"> | kw<"volatile"> |
+  ckw<"sealed"> | nonSealedModifier
+}
+
+nonSealedModifier {
+  ckw<"non"> "-" ckw<"sealed">
+}
+
+TypeParameters {
+  "<" commaSep1<TypeParameter> ">"
+}
+
+TypeParameter {
+  annotation* Definition TypeBound?
+}
+
+TypeBound {
+  kw<"extends"> type ("&" type)*
+}
+
+Superclass {
+  kw<"extends"> type
+}
+
+SuperInterfaces {
+  kw<"implements"> InterfaceTypeList
+}
+
+Permits {
+  ckw<"permits"> InterfaceTypeList
+}
+
+InterfaceTypeList {
+  commaSep1<type>
+}
+
+ClassBody {
+  "{" classBodyDeclaration* "}"
+}
+
+classBodyDeclaration {
+  FieldDeclaration |
+  MethodDeclaration |
+  ClassDeclaration |
+  RecordDeclaration |
+  InterfaceDeclaration |
+  TraitDeclaration |
+  AnnotationTypeDeclaration |
+  EnumDeclaration |
+  Block |
+  StaticInitializer |
+  ConstructorDeclaration |
+  untypedAbstractMethodDeclaration |
+  ";"
+}
+
+// `protected abstract search()`
+untypedAbstractMethodDeclaration[@name=MethodDeclaration] {
+  Modifiers constructorDeclarator Throws? semi
+}
+
+StaticInitializer {
+  kw<"static"> Block
+}
+
+// Also covers a member declared with modifiers but no return type, such as
+// `static main(args) { ... }`, which Groovy parses the same way.
+ConstructorDeclaration {
+  Modifiers? constructorDeclarator Throws? ConstructorBody
+}
+
+constructorDeclarator {
+  TypeParameters? Definition FormalParameters
+}
+
+ConstructorBody {
+  "{" statement* (ExplicitConstructorInvocation statement*)? "}"
+}
+
+ExplicitConstructorInvocation {
+  (TypeArguments? (kw<"this"> | kw<"super">) | (baseExpression) memberOp TypeArguments? kw<"super">) ArgumentList semi
+}
+
+name {
+  Identifier |
+  ScopedIdentifier
+}
+
+ScopedIdentifier {
+  name "." Identifier
+}
+
+// A property may be declared with modifiers and no type:
+// `static constraints = { ... }`.
+FieldDeclaration {
+  Modifiers? unannotatedType commaSep1<VariableDeclarator> semi |
+  Modifiers commaSep1<VariableDeclarator> semi
+}
+
+RecordDeclaration {
+  Modifiers? ckw<"record"> Definition TypeParameters? RecordHeader SuperInterfaces? RecordBody
+}
+
+RecordHeader {
+  "(" commaSep<RecordComponent> ")"
+}
+
+RecordComponent {
+  Modifiers? unannotatedType (
+    annotation* "..." Definition |
+    variableDeclaratorId
+  )
+}
+
+RecordBody {
+  "{" recordBodyDeclaration* "}"
+}
+
+recordBodyDeclaration {
+  CompactConstructorDeclaration |
+  classBodyDeclaration
+}
+
+CompactConstructorDeclaration {
+  Modifiers? Definition Block
+}
+
+AnnotationTypeDeclaration {
+  Modifiers? "@interface" Definition AnnotationTypeBody
+}
+
+AnnotationTypeBody {
+  "{" (
+    AnnotationTypeElementDeclaration |
+    ConstantDeclaration |
+    ClassDeclaration |
+    RecordDeclaration |
+    InterfaceDeclaration |
+    AnnotationTypeDeclaration
+  )* "}"
+}
+
+AnnotationTypeElementDeclaration {
+  Modifiers? unannotatedType Identifier "(" ")" Dimension* defaultValue? semi
+}
+
+defaultValue {
+  kw<"default"> elementValue
+}
+
+InterfaceDeclaration {
+  Modifiers? kw<"interface"> Definition TypeParameters? ExtendsInterfaces? Permits? InterfaceBody
+}
+
+ExtendsInterfaces {
+  kw<"extends"> InterfaceTypeList
+}
+
+InterfaceBody {
+  "{" (
+    ConstantDeclaration |
+    EnumDeclaration |
+    MethodDeclaration |
+    ClassDeclaration |
+    RecordDeclaration |
+    InterfaceDeclaration |
+    TraitDeclaration |
+    AnnotationTypeDeclaration |
+    ";"
+  )* "}"
+}
+
+ConstantDeclaration {
+  Modifiers? unannotatedType commaSep1<VariableDeclarator> semi
+}
+
+VariableDeclarator {
+  variableDeclaratorId ("=" expression)? ~closureParameter
+}
+
+// A single declared variable may be initialised by a command call:
+// `def total = sum 1, 2`.
+commandDeclarator[@name=VariableDeclarator] {
+  variableDeclaratorId "=" CommandExpression
+}
+
+variableDeclaratorId {
+  Definition Dimension*
+}
+
+type[@isGroup=Type] {
+  unannotatedType ~typePattern |
+  AnnotatedType { annotation+ unannotatedType }
+}
+
+unannotatedType {
+  ~annotations simpleType |
+  ArrayType ~typeValue
+}
+
+// `def` stands where a type would, in declarations, parameters and casts.
+simpleType {
+  kw<"void"> |
+  kw<"def"> |
+  primitiveType ~typeValue |
+  TypeName |
+  ScopedTypeName |
+  GenericType ~typeValue
+}
+
+TypeName {
+  ~annotations (
+    capitalIdentifier ~identifier |
+    [@dynamicPrecedence=-1] { identifier ~identifier }
+  )
+}
+
+Identifier {
+  identifier ~identifier |
+  [@dynamicPrecedence=-1] { capitalIdentifier ~identifier }
+}
+
+Definition {
+  ~typePattern identifier ~identifier |
+  ~typePattern capitalIdentifier ~identifier
+}
+
+PropertyName {
+  identifier ~identifier |
+  [@dynamicPrecedence=-1] { capitalIdentifier ~identifier } |
+  memberKeyword ~memberKeyword
+}
+
+primitiveType {
+  @specialize[@name=PrimitiveType]<identifier, "byte" | "short" | "int" | "long" | "char" | "float" | "double" | "boolean">
+}
+
+booleanLiteral {
+  @specialize[@name=BooleanLiteral]<identifier, "true" | "false">
+}
+
+ScopedTypeName {
+  (TypeName | ScopedTypeName | GenericType) !scope "." annotation* TypeName
+}
+
+GenericType[@dynamicPrecedence=1] {
+  (TypeName | ScopedTypeName) !typeArgs TypeArguments
+}
+
+ArrayType {
+  unannotatedType !array Dimension+
+}
+
+methodHeader {
+  (TypeParameters annotation*)? unannotatedType methodDeclarator Throws? |
+  kw<"def"> TypeParameters annotation* unannotatedType methodDeclarator Throws?
+}
+
+// Spock and other DSLs name methods with strings: `def "adds two numbers"()`.
+methodDeclarator {
+  (Definition | StringLiteral | GString) FormalParameters Dimension*
+}
+
+FormalParameters {
+  "(" commaSep<FormalParameter | SpreadParameter> ")"
+}
+
+// Parameters may be untyped and may have default values.
+FormalParameter {
+  Modifiers? unannotatedType? variableDeclaratorId ~arrow ("=" expression)? ~closureParameter
+}
+
+SpreadParameter {
+  Modifiers? unannotatedType annotation* "..." VariableDeclarator
+}
+
+Throws {
+  kw<"throws"> commaSep1<type>
+}
+
+LocalVariableDeclaration {
+  Modifiers? (ckw<"var"> | unannotatedType) (commaSep1<VariableDeclarator> | commandDeclarator) semi |
+  Modifiers (commaSep1<VariableDeclarator> | commandDeclarator) semi |
+  Modifiers? kw<"def"> MultipleAssignment "=" expression semi
+}
+
+// `def (a, b) = [1, 2]`
+MultipleAssignment {
+  "(" commaSep1<unannotatedType? Definition> ")"
+}
+
+MethodDeclaration {
+  Modifiers? methodHeader (Block | semi)
+}
+
+kw<term> { @specialize[@name={term}]<identifier, term> }
+
+ckw<term> { @extend[@name={term}]<identifier, term> }
+
+commaSep<expr> { (expr ("," expr)*)? }
+
+commaSep1<expr> { expr ("," expr)* }
+
+commaSepTrailing<expr> { (expr ("," expr?)*)? }
+
+@skip { whitespace | lineContinuation | LineComment | BlockComment | Shebang }
+
+@context trackSkipped from "./tokens.js"
+
+@external tokens insertSemicolon from "./tokens.js" { insertSemi }
+
+@external tokens commandCall from "./tokens.js" { commandStart }
+
+@external tokens blockBrace from "./tokens.js" { blockOpen[@name="{",closedBy="}"] }
+
+@external tokens shiftOperator from "./tokens.js" { shiftOp[@name=BitOp] }
+
+@external tokens switchKeyword from "./tokens.js" { statementSwitch[@name=switch] }
+
+@local tokens {
+  gstringEnd { '"' }
+  gstringLineEnd { "\n" }
+  gstringInterpolationStart[@name=InterpolationStart] { "${" }
+  gstringVariable[@name=InterpolatedVariable] { gstringPath }
+  gstringEscape[@name=Escape] { escapeSequence }
+  @else gstringContent
+}
+
+@local tokens {
+  tripleGStringEnd { '"""' }
+  tripleGStringInterpolationStart[@name=InterpolationStart] { "${" }
+  tripleGStringVariable[@name=InterpolatedVariable] { gstringPath }
+  tripleGStringEscape[@name=Escape] { escapeSequence }
+  @else tripleGStringContent
+}
+
+@local tokens {
+  slashyEnd { "/" }
+  slashyInterpolationStart[@name=InterpolationStart] { "${" }
+  slashyVariable[@name=InterpolatedVariable] { gstringPath }
+  slashyEscape[@name=Escape] { "\\/" }
+  @else slashyContent
+}
+
+@local tokens {
+  dollarSlashyEnd { "/$" }
+  dollarSlashyInterpolationStart[@name=InterpolationStart] { "${" }
+  dollarSlashyVariable[@name=InterpolatedVariable] { gstringPath }
+  dollarSlashyEscape[@name=Escape] { "$$" | "$/" }
+  @else dollarSlashyContent
+}
+
+@tokens {
+  whitespace[@export] {
+    @whitespace+
+  }
+
+  Shebang { "#!" ![\n]* }
+
+  // A backslash at the end of a line joins it to the next one.
+  lineContinuation[@export] { "\\" ("\r"? "\n") }
+
+  digits {
+    $[0-9]+ ("_"+ $[0-9]+)*
+  }
+
+  hexDigits {
+    $[A-Fa-f0-9]+ ("_"+ $[A-Fa-f0-9]+)*
+  }
+
+  // l/L long, i/I int, g/G BigInteger
+  IntegerLiteral {
+    (digits |
+     ("0x" | "0X") hexDigits |
+     ("0b" | "0B") $[01]+ ("_"+ $[01]+)*)
+    $[lLiIgG]?
+  }
+
+  exponent {
+    $[eE] ("-" | "+")? digits
+  }
+
+  // f/F float, d/D double, g/G BigDecimal. Groovy has no `1.` literal, which
+  // leaves `1.toString()` and `1..5` to mean what they say.
+  FloatingPointLiteral {
+    digits ("." digits exponent? $[fFdDgG]? | exponent $[fFdDgG]? | $[fFdD]) |
+    "." digits exponent? $[fFdDgG]?
+  }
+
+  @precedence { FloatingPointLiteral, IntegerLiteral }
+
+  @precedence { FloatingPointLiteral, "." }
+
+  // Single-quoted strings do not interpolate. An unterminated one ends at the
+  // end of the line, so the rest of the document is not swallowed.
+  StringLiteral[isolate] {
+    "'" (![\\'\n] | "\\" _)* ("'" | "\n") |
+    "'''" (tripleQuoteChar | "'" tripleQuoteChar | "''" tripleQuoteChar)* "'''"
+  }
+
+  tripleQuoteChar { ![\\'] | "\\" _ }
+
+  gstringStart { '"' }
+
+  tripleGStringStart { '"""' }
+
+  slashyStart { "/" }
+
+  dollarSlashyStart { "$/" }
+
+  hex { $[0-9a-fA-F] }
+
+  escapeSequence { "\\" (_ | "u" hex hex hex hex) }
+
+  gstringIdentifierChar { @asciiLetter | @digit | $[_\u{a1}-\u{10ffff}] }
+
+  gstringPath {
+    "$" (@asciiLetter | $[_\u{a1}-\u{10ffff}]) gstringIdentifierChar*
+    ("." (@asciiLetter | $[_\u{a1}-\u{10ffff}]) gstringIdentifierChar*)*
+  }
+
+  InterpolationEnd[openedBy=InterpolationStart] { "}" }
+
+  Asterisk { "*" }
+
+  identifierChar { @asciiLetter | @digit | $[$_\u{a1}-\u{10ffff}] }
+
+  identifier { $[a-z_$\u{a1}-\u{10ffff}] identifierChar* }
+
+  @precedence { whitespace, identifier }
+
+  @precedence { dollarSlashyStart, identifier }
+
+  capitalIdentifier { $[A-Z] identifierChar* }
+
+  AssignOp {
+    ("+" | "-" | "*" | "/" | "&" | "|" | "^" | "%" | "<<" | ">>" ">"? | "**" | "?") "="
+  }
+
+  op[@name={name} "Op"]<name, body> { body }
+
+  times[@name=ArithOp] { "*" | "/" | "%" }
+
+  LineComment[isolate] {
+    "//" ![\n]*
+  }
+
+  BlockComment[isolate] { "/*" blockCommentRest }
+
+  blockCommentRest { ![*] blockCommentRest | "*" blockCommentAfterStar }
+
+  blockCommentAfterStar { "/" | "*" blockCommentAfterStar | ![/*] blockCommentRest }
+
+  @precedence { LineComment, times }
+  @precedence { BlockComment, times }
+  @precedence { LineComment, slashyStart }
+  @precedence { BlockComment, slashyStart }
+
+  "="[@name=AssignOp]
+
+  "{" "}" "(" ")" "[" "]" "." "," ";" ":" "@" "@interface"
+  "?." "*." ".@" ".&" "::" "->" ".." "..<" "<.." "<..<" "..." "*:"
+}
+
+@external propSource groovyHighlighting from "./highlight.js"
+
+@detectDelim

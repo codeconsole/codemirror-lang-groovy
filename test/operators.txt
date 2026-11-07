@@ -1,0 +1,110 @@
+# Safe navigation, spread and member access
+
+a?.b?.c
+people*.name
+obj.@field
+def ref = str.&toUpperCase
+def mr = String::valueOf
+
+==>
+
+Program(ExpressionStatement(FieldAccess(FieldAccess(Identifier,PropertyName),PropertyName)),ExpressionStatement(FieldAccess(Identifier,PropertyName)),ExpressionStatement(FieldAccess(Identifier,PropertyName)),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MethodReference(Identifier,Identifier))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MethodReference(TypeName,Identifier))))
+
+
+# Elvis and ternary
+
+def name = given ?: 'anonymous'
+def kind = n > 0 ? 'positive' : 'other'
+x ?= 1
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,ElvisExpression(Identifier,LogicOp,StringLiteral))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,TernaryExpression(BinaryExpression(Identifier,CompareOp,IntegerLiteral),LogicOp,StringLiteral,StringLiteral))),ExpressionStatement(AssignmentExpression(Identifier,AssignOp,IntegerLiteral)))
+
+
+# Ranges
+
+def r1 = 1..10
+def r2 = 0..<n
+(1..5).each { println it }
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,RangeExpression(IntegerLiteral,IntegerLiteral))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,RangeExpression(IntegerLiteral,Identifier))),ExpressionStatement(MethodInvocation(ParenthesizedExpression(RangeExpression(IntegerLiteral,IntegerLiteral)),MethodName(Identifier),Closure(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier)))))))
+
+
+# Groovy comparison and regex operators
+
+a <=> b
+a === b
+a !== b
+text =~ /\d+/
+text ==~ /\d+/
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier,CompareOp,Identifier)),ExpressionStatement(BinaryExpression(Identifier,CompareOp,Identifier)),ExpressionStatement(BinaryExpression(Identifier,CompareOp,Identifier)),ExpressionStatement(BinaryExpression(Identifier,CompareOp,SlashyString)),ExpressionStatement(BinaryExpression(Identifier,CompareOp,SlashyString)))
+
+
+# Power binds tighter than unary minus
+
+def p = -2 ** 2
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,UnaryExpression(ArithOp,BinaryExpression(IntegerLiteral,ArithOp,IntegerLiteral)))))
+
+
+# in, as and instanceof
+
+x in list
+x !in list
+x as String
+x instanceof Map
+x !instanceof Map
+if (result instanceof Promise promise) { }
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier,in,Identifier)),ExpressionStatement(BinaryExpression(Identifier,LogicOp,in,Identifier)),ExpressionStatement(AsExpression(Identifier,as,TypeName)),ExpressionStatement(InstanceofExpression(Identifier,instanceof,TypeName)),ExpressionStatement(InstanceofExpression(Identifier,LogicOp,instanceof,TypeName)),IfStatement(if,ParenthesizedExpression(InstanceofExpression(Identifier,instanceof,TypePattern(TypeName,Definition))),Block))
+
+
+# Shift operators and nested generics
+
+def shifted = a >> 2 << 1 >>> 3
+Map<String, List<Integer>> m = [:]
+x >>= 1
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,BinaryExpression(BinaryExpression(BinaryExpression(Identifier,BitOp,IntegerLiteral),BitOp,IntegerLiteral),BitOp,IntegerLiteral))),LocalVariableDeclaration(GenericType(TypeName,TypeArguments(TypeName,GenericType(TypeName,TypeArguments(TypeName)))),VariableDeclarator(Definition,AssignOp,MapExpression)),ExpressionStatement(AssignmentExpression(Identifier,AssignOp,IntegerLiteral)))
+
+
+# Number literals
+
+def n = [1, 1L, 1G, 1.5, 1.5G, 1e3, 1d, 0x1F, 0b1010, 1_000_000, .5]
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,ListExpression(IntegerLiteral,IntegerLiteral,IntegerLiteral,FloatingPointLiteral,FloatingPointLiteral,FloatingPointLiteral,FloatingPointLiteral,IntegerLiteral,IntegerLiteral,IntegerLiteral,FloatingPointLiteral))))
+
+
+# Method calls on literals
+
+5.times { println it }
+1.toString()
+
+==>
+
+Program(ExpressionStatement(MethodInvocation(IntegerLiteral,MethodName(Identifier),Closure(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier)))))),ExpressionStatement(MethodInvocation(IntegerLiteral,MethodName(Identifier),ArgumentList)))
+
+
+# Types as values
+
+getMethod('size', int)
+getBean(name, MimeType[])
+type in [boolean, Boolean]
+
+==>
+
+Program(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList(StringLiteral,ClassLiteral(PrimitiveType)))),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList(Identifier,ClassLiteral(ArrayType(TypeName,Dimension))))),ExpressionStatement(BinaryExpression(Identifier,in,ListExpression(ClassLiteral(PrimitiveType),Identifier))))

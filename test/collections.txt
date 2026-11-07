@@ -1,0 +1,54 @@
+# Lists
+
+def empty = []
+def nums = [1, 2, 3,]
+def nested = [[1], [2, 3]]
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,ListExpression)),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,ListExpression(IntegerLiteral,IntegerLiteral,IntegerLiteral))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,ListExpression(ListExpression(IntegerLiteral),ListExpression(IntegerLiteral,IntegerLiteral)))))
+
+
+# Maps
+
+def emptyMap = [:]
+def m = [name: 'Ann', 'age': 3, (key): value, 1: 'one']
+def kw = [class: 'btn', in: 1, default: 2]
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MapExpression)),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MapExpression(MapEntry(PropertyName,StringLiteral),MapEntry(StringLiteral,IntegerLiteral),MapEntry(ParenthesizedExpression(Identifier),Identifier),MapEntry(IntegerLiteral,StringLiteral)))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MapExpression(MapEntry(PropertyName(class),StringLiteral),MapEntry(PropertyName,IntegerLiteral),MapEntry(PropertyName(default),IntegerLiteral)))))
+
+
+# Spread
+
+def all = [*first, *second]
+def merged = [*: defaults, extra: 1]
+call(*args)
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,ListExpression(SpreadArgument(Asterisk,Identifier),SpreadArgument(Asterisk,Identifier)))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MapExpression(SpreadMapArgument(Identifier),MapEntry(PropertyName,IntegerLiteral)))),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList(SpreadArgument(Asterisk,Identifier)))))
+
+
+# Named arguments
+
+new Person(name: 'Ann', age: 3)
+redirect(action: 'index', params: [id: id])
+link(class: 'btn', controller: 'book') { 'Books' }
+
+==>
+
+Program(ExpressionStatement(ObjectCreationExpression(new,TypeName,ArgumentList(NamedArgument(PropertyName,StringLiteral),NamedArgument(PropertyName,IntegerLiteral)))),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList(NamedArgument(PropertyName,StringLiteral),NamedArgument(PropertyName,MapExpression(MapEntry(PropertyName,Identifier)))))),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList(NamedArgument(PropertyName(class),StringLiteral),NamedArgument(PropertyName,StringLiteral)),Closure(ExpressionStatement(StringLiteral)))))
+
+
+# Indexing
+
+list[0]
+map['key']
+matrix[1][2]
+sub[1..3]
+
+==>
+
+Program(ExpressionStatement(ArrayAccess(Identifier,IntegerLiteral)),ExpressionStatement(ArrayAccess(Identifier,StringLiteral)),ExpressionStatement(ArrayAccess(ArrayAccess(Identifier,IntegerLiteral),IntegerLiteral)),ExpressionStatement(ArrayAccess(Identifier,RangeExpression(IntegerLiteral,IntegerLiteral))))

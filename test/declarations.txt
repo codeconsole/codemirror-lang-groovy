@@ -1,0 +1,169 @@
+# Variables
+
+def a = 1
+var b = 2
+int c = 3
+final d = 4
+String e, f = 'x'
+List<Map<String, Object>> rows = []
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,IntegerLiteral)),LocalVariableDeclaration(var,VariableDeclarator(Definition,AssignOp,IntegerLiteral)),LocalVariableDeclaration(PrimitiveType,VariableDeclarator(Definition,AssignOp,IntegerLiteral)),LocalVariableDeclaration(Modifiers(final),VariableDeclarator(Definition,AssignOp,IntegerLiteral)),LocalVariableDeclaration(TypeName,VariableDeclarator(Definition),VariableDeclarator(Definition,AssignOp,StringLiteral)),LocalVariableDeclaration(GenericType(TypeName,TypeArguments(GenericType(TypeName,TypeArguments(TypeName,TypeName)))),VariableDeclarator(Definition,AssignOp,ListExpression)))
+
+
+# Multiple assignment
+
+def (first, second) = [1, 2]
+def (int x, String y) = pair
+
+==>
+
+Program(LocalVariableDeclaration(def,MultipleAssignment(Definition,Definition),AssignOp,ListExpression(IntegerLiteral,IntegerLiteral)),LocalVariableDeclaration(def,MultipleAssignment(PrimitiveType,Definition,TypeName,Definition),AssignOp,Identifier))
+
+
+# Script methods
+
+def greet(name) {
+  "Hello $name"
+}
+void log(String msg, int level = 0) { }
+static main(args) { }
+
+==>
+
+Program(MethodDeclaration(def,Definition,FormalParameters(FormalParameter(Definition)),Block(ExpressionStatement(GString(InterpolatedVariable)))),MethodDeclaration(void,Definition,FormalParameters(FormalParameter(TypeName,Definition),FormalParameter(PrimitiveType,Definition,AssignOp,IntegerLiteral)),Block),MethodDeclaration(Modifiers(static),Definition,FormalParameters(FormalParameter(Definition)),Block))
+
+
+# Imports and packages
+
+package com.example.app
+
+import java.util.List
+import static java.lang.Math.*
+import groovy.json.JsonSlurper as Slurper
+
+==>
+
+Program(PackageDeclaration(package,ScopedIdentifier(ScopedIdentifier(Identifier,Identifier),Identifier)),ImportDeclaration(import,ScopedIdentifier(ScopedIdentifier(Identifier,Identifier),Identifier)),ImportDeclaration(import,static,ScopedIdentifier(ScopedIdentifier(Identifier,Identifier),Identifier),Asterisk),ImportDeclaration(import,ScopedIdentifier(ScopedIdentifier(Identifier,Identifier),Identifier),as,Definition))
+
+
+# A class with properties, methods and annotations
+
+@CompileStatic
+class Book implements Serializable {
+  String title
+  def author
+  static constraints = {
+    title blank: false
+  }
+  private int pages = 0
+
+  Book(String title) { this.title = title }
+
+  String toString() { title }
+
+  def <T> T convert(Class<T> type) { type.cast(this) }
+
+  void read() throws IOException {
+  }
+}
+
+==>
+
+Program(ClassDeclaration(Modifiers(MarkerAnnotation(Identifier)),class,Definition,SuperInterfaces(implements,InterfaceTypeList(TypeName)),ClassBody(FieldDeclaration(TypeName,VariableDeclarator(Definition)),FieldDeclaration(def,VariableDeclarator(Definition)),FieldDeclaration(Modifiers(static),VariableDeclarator(Definition,AssignOp,Closure(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(NamedArgument(PropertyName,BooleanLiteral))))))),FieldDeclaration(Modifiers(private),PrimitiveType,VariableDeclarator(Definition,AssignOp,IntegerLiteral)),ConstructorDeclaration(Definition,FormalParameters(FormalParameter(TypeName,Definition)),ConstructorBody(ExpressionStatement(AssignmentExpression(FieldAccess(this,PropertyName),AssignOp,Identifier)))),MethodDeclaration(TypeName,Definition,FormalParameters,Block(ExpressionStatement(Identifier))),MethodDeclaration(def,TypeParameters(TypeParameter(Definition)),TypeName,Definition,FormalParameters(FormalParameter(GenericType(TypeName,TypeArguments(TypeName)),Definition)),Block(ExpressionStatement(MethodInvocation(Identifier,MethodName(Identifier),ArgumentList(this))))),MethodDeclaration(void,Definition,FormalParameters,Throws(throws,TypeName),Block))))
+
+
+# throws on the next line
+
+void read()
+    throws IOException {
+}
+
+==>
+
+Program(MethodDeclaration(void,Definition,FormalParameters,Throws(throws,TypeName),Block))
+
+
+# Abstract methods without a return type
+
+abstract class Base {
+  abstract search()
+  protected abstract List<String> names()
+}
+
+==>
+
+Program(ClassDeclaration(Modifiers(abstract),class,Definition,ClassBody(MethodDeclaration(Modifiers(abstract),Definition,FormalParameters),MethodDeclaration(Modifiers(protected,abstract),GenericType(TypeName,TypeArguments(TypeName)),Definition,FormalParameters))))
+
+
+# Traits, interfaces and records
+
+trait Greeter {
+  String greet() { "hi" }
+}
+interface Shape {
+  double area()
+}
+record Point(int x, int y) { }
+
+==>
+
+Program(TraitDeclaration(trait,Definition,ClassBody(MethodDeclaration(TypeName,Definition,FormalParameters,Block(ExpressionStatement(GString))))),InterfaceDeclaration(interface,Definition,InterfaceBody(MethodDeclaration(PrimitiveType,Definition,FormalParameters))),RecordDeclaration(record,Definition,RecordHeader(RecordComponent(PrimitiveType,Definition),RecordComponent(PrimitiveType,Definition)),RecordBody))
+
+
+# Enums
+
+enum Color {
+  RED, GREEN,
+  BLUE
+}
+enum Planet {
+  EARTH(5.97e24),
+  MARS(6.42e23)
+
+  final double mass
+  Planet(double mass) { this.mass = mass }
+}
+
+==>
+
+Program(EnumDeclaration(enum,Definition,EnumBody(EnumConstant(Definition),EnumConstant(Definition),EnumConstant(Definition))),EnumDeclaration(enum,Definition,EnumBody(EnumConstant(Definition,ArgumentList(FloatingPointLiteral)),EnumConstant(Definition,ArgumentList(FloatingPointLiteral)),FieldDeclaration(Modifiers(final),PrimitiveType,VariableDeclarator(Definition)),ConstructorDeclaration(Definition,FormalParameters(FormalParameter(PrimitiveType,Definition)),ConstructorBody(ExpressionStatement(AssignmentExpression(FieldAccess(this,PropertyName),AssignOp,Identifier)))))))
+
+
+# Spock feature methods named by strings
+
+class MathSpec extends Specification {
+  def "adds #a and #b"() {
+    expect:
+    a + b == c
+
+    where:
+    a | b || c
+    1 | 2 || 3
+  }
+}
+
+==>
+
+Program(ClassDeclaration(class,Definition,Superclass(extends,TypeName),ClassBody(MethodDeclaration(def,GString,FormalParameters,Block(LabeledStatement(Label,ExpressionStatement(BinaryExpression(BinaryExpression(Identifier,ArithOp,Identifier),CompareOp,Identifier))),LabeledStatement(Label,ExpressionStatement(BinaryExpression(BinaryExpression(Identifier,BitOp,Identifier),LogicOp,Identifier))),ExpressionStatement(BinaryExpression(BinaryExpression(IntegerLiteral,BitOp,IntegerLiteral),LogicOp,IntegerLiteral)))))))
+
+
+# Trait super calls
+
+def x = GormEntity.super.addTo(name, arg)
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MethodInvocation(Identifier,super,MethodName(Identifier),ArgumentList(Identifier,Identifier)))))
+
+
+# Contextual keywords as names
+
+def trait = 1
+Query.In in = query
+println System.in
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,IntegerLiteral)),LocalVariableDeclaration(ScopedTypeName(TypeName,TypeName),VariableDeclarator(Definition,AssignOp,Identifier)),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(FieldAccess(Identifier,PropertyName)))))

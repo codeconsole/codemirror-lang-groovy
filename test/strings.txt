@@ -1,0 +1,119 @@
+# Single-quoted strings
+
+def a = 'plain'
+def b = 'it\'s'
+def c = '''multi
+line'''
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,StringLiteral)),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,StringLiteral)),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,StringLiteral)))
+
+
+# GString interpolation
+
+def g = "Hello $name, you are ${age + 1} next year"
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,GString(InterpolatedVariable,Interpolation(InterpolationStart,ExpressionStatement(BinaryExpression(Identifier,ArithOp,IntegerLiteral)),InterpolationEnd)))))
+
+
+# Interpolated property paths
+
+println "$user.name lives in $user.address.city."
+
+==>
+
+Program(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(GString(InterpolatedVariable,InterpolatedVariable)))))
+
+
+# A lazily evaluated interpolation
+
+def lazy = "now: ${-> new Date()}"
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,GString(Interpolation(InterpolationStart,ExpressionStatement(ObjectCreationExpression(new,TypeName,ArgumentList)),InterpolationEnd)))))
+
+
+# Escapes in GStrings
+
+def e = "tab\there \$notInterpolated \u00e9"
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,GString(Escape,Escape,Escape))))
+
+
+# Triple-quoted GStrings
+
+def t = """
+  Dear $name,
+  ${body}
+"""
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,GString(InterpolatedVariable,Interpolation(InterpolationStart,ExpressionStatement(Identifier),InterpolationEnd)))))
+
+
+# Slashy strings
+
+def re = /\d+\/\d+/
+def dyn = /$prefix-\d+$/
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,SlashyString(Escape))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,SlashyString(InterpolatedVariable))))
+
+
+# Dollar-slashy strings
+
+def ds = $/C:\temp\$name, $$dollar, $/slash/$
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,DollarSlashyString(InterpolatedVariable,Escape,Escape))))
+
+
+# Division is not a slashy string
+
+def half = total / 2
+def ratio = (a + b) / c / d
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,BinaryExpression(Identifier,ArithOp,IntegerLiteral))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,BinaryExpression(BinaryExpression(ParenthesizedExpression(BinaryExpression(Identifier,ArithOp,Identifier)),ArithOp,Identifier),ArithOp,Identifier))))
+
+
+# An interpolation that declares, as in a GORM query
+
+interface BookService {
+  @Query("from ${Book b} where b.title = $title")
+  List<Book> find(String title)
+}
+
+==>
+
+Program(InterfaceDeclaration(interface,Definition,InterfaceBody(MethodDeclaration(Modifiers(Annotation(Identifier,AnnotationArgumentList(GString(Interpolation(InterpolationStart,LocalVariableDeclaration(TypeName,VariableDeclarator(Definition)),InterpolationEnd),InterpolatedVariable)))),GenericType(TypeName,TypeArguments(TypeName)),Definition,FormalParameters(FormalParameter(TypeName,Definition))))))
+
+
+# A quoted member name
+
+json.'some-key'.value
+obj."$method"(1)
+
+==>
+
+Program(ExpressionStatement(FieldAccess(FieldAccess(Identifier,StringLiteral),PropertyName)),ExpressionStatement(MethodInvocation(Identifier,GString(InterpolatedVariable),ArgumentList(IntegerLiteral))))
+
+
+# An unterminated string ends at the end of the line
+
+def s = "open
+println s
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,GString)),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier))))

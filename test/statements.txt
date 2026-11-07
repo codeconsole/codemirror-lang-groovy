@@ -1,0 +1,231 @@
+# Statements end at a line break
+
+def a = 1
+a = a + 1
+println a
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,IntegerLiteral)),ExpressionStatement(AssignmentExpression(Identifier,AssignOp,BinaryExpression(Identifier,ArithOp,IntegerLiteral))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier))))
+
+
+# Semicolons still separate statements
+
+a = 1; b = 2;
+c()
+
+==>
+
+Program(ExpressionStatement(AssignmentExpression(Identifier,AssignOp,IntegerLiteral)),ExpressionStatement(AssignmentExpression(Identifier,AssignOp,IntegerLiteral)),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList)))
+
+
+# A leading dot continues the previous line
+
+def names = people
+    .findAll { it.age > 18 }
+    ?.collect { it.name }
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MethodInvocation(MethodInvocation(Identifier,MethodName(Identifier),Closure(ExpressionStatement(BinaryExpression(FieldAccess(Identifier,PropertyName),CompareOp,IntegerLiteral)))),MethodName(Identifier),Closure(ExpressionStatement(FieldAccess(Identifier,PropertyName)))))))
+
+
+# A trailing operator continues onto the next line
+
+def total = first +
+    second
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,BinaryExpression(Identifier,ArithOp,Identifier))))
+
+
+# A leading binary operator continues, but plus and minus start a statement
+
+def ok = ready
+    && valid
+x = 1
+-1
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,BinaryExpression(Identifier,LogicOp,Identifier))),ExpressionStatement(AssignmentExpression(Identifier,AssignOp,IntegerLiteral)),ExpressionStatement(UnaryExpression(ArithOp,IntegerLiteral)))
+
+
+# A line ending in a comma continues
+
+foo(a,
+    b)
+bar a,
+    b
+
+==>
+
+Program(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList(Identifier,Identifier))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier,Identifier))))
+
+
+# A comment between lines does not join them
+
+a = 1 // one
+/* two */ b = 2
+
+==>
+
+Program(ExpressionStatement(AssignmentExpression(Identifier,AssignOp,IntegerLiteral)),LineComment,BlockComment,ExpressionStatement(AssignmentExpression(Identifier,AssignOp,IntegerLiteral)))
+
+
+# else on the same line ends the statement
+
+if (x) foo() else bar()
+
+==>
+
+Program(IfStatement(if,ParenthesizedExpression(Identifier),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList)),else,ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList))))
+
+
+# else on the next line
+
+if (x) {
+  foo()
+}
+else {
+  bar()
+}
+
+==>
+
+Program(IfStatement(if,ParenthesizedExpression(Identifier),Block(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList))),else,Block(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList)))))
+
+
+# return with and without a value
+
+def f() {
+  if (done) return
+  return 42
+}
+
+==>
+
+Program(MethodDeclaration(def,Definition,FormalParameters,Block(IfStatement(if,ParenthesizedExpression(Identifier),ReturnStatement(return)),ReturnStatement(return,IntegerLiteral))))
+
+
+# Loops
+
+for (int i = 0; i < 10; i++) println i
+for (item in items) { process(item) }
+for (String s : names) println s
+while (running) step()
+do { tick() } while (alive)
+
+==>
+
+Program(ForStatement(for,ForSpec(LocalVariableDeclaration(PrimitiveType,VariableDeclarator(Definition,AssignOp,IntegerLiteral)),BinaryExpression(Identifier,CompareOp,IntegerLiteral),UpdateExpression(Identifier,UpdateOp)),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier)))),EnhancedForStatement(for,ForSpec(Definition,in,Identifier),Block(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList(Identifier))))),EnhancedForStatement(for,ForSpec(TypeName,Definition,Identifier),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier)))),WhileStatement(while,ParenthesizedExpression(Identifier),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList))),DoStatement(do,Block(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList))),while,ParenthesizedExpression(Identifier)))
+
+
+# switch with case fallthrough and arrow rules
+
+switch (value) {
+  case 1:
+  case [2, 3]:
+    small()
+    break
+  case String:
+    text()
+    break
+  case ~/a.*/:
+  case { it > 10 }:
+    big()
+  default:
+    other()
+}
+def size = switch (n) {
+  case 0 -> 'none'
+  default -> 'some'
+}
+
+==>
+
+Program(SwitchStatement(switch,ParenthesizedExpression(Identifier),SwitchBlock(SwitchLabel(case,IntegerLiteral),SwitchLabel(case,ListExpression(IntegerLiteral,IntegerLiteral)),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList)),BreakStatement(break),SwitchLabel(case,Identifier),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList)),BreakStatement(break),SwitchLabel(case,UnaryExpression(BitOp,SlashyString)),SwitchLabel(case,Closure(ExpressionStatement(BinaryExpression(Identifier,CompareOp,IntegerLiteral)))),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList)),SwitchLabel(default),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList)))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,SwitchExpression(switch,ParenthesizedExpression(Identifier),SwitchBlock(SwitchRule(SwitchLabel(case,IntegerLiteral),ExpressionStatement(StringLiteral)),SwitchRule(SwitchLabel(default),ExpressionStatement(StringLiteral)))))))
+
+
+# try, catch with and without a type, and finally
+
+try {
+  risky()
+} catch (IOException | IllegalStateException e) {
+  log.error 'failed', e
+} catch (e) {
+  throw e
+} finally {
+  close()
+}
+
+==>
+
+Program(TryStatement(try,Block(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList))),CatchClause(catch,CatchFormalParameter(CatchType(TypeName,TypeName),Definition),Block(ExpressionStatement(CommandExpression(Identifier,MethodName(Identifier),CommandArguments(StringLiteral,Identifier))))),CatchClause(catch,CatchFormalParameter(Definition),Block(ThrowStatement(throw,Identifier))),FinallyClause(finally,Block(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList))))))
+
+
+# assert with a message
+
+assert total == 3 : 'total is wrong'
+assert ok, "not ok"
+
+==>
+
+Program(AssertStatement(assert,BinaryExpression(Identifier,CompareOp,IntegerLiteral),StringLiteral),AssertStatement(assert,Identifier,GString))
+
+
+# Labeled statements
+
+outer:
+for (row in rows) {
+  for (cell in row) {
+    if (cell) continue outer
+  }
+}
+
+==>
+
+Program(LabeledStatement(Label,EnhancedForStatement(for,ForSpec(Definition,in,Identifier),Block(EnhancedForStatement(for,ForSpec(Definition,in,Identifier),Block(IfStatement(if,ParenthesizedExpression(Identifier),ContinueStatement(continue,Label))))))))
+
+
+# A block at the start of a statement
+
+{
+  def scoped = 1
+}
+
+==>
+
+Program(Block(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,IntegerLiteral))))
+
+
+# A shebang line
+
+#!/usr/bin/env groovy
+println 'hi'
+
+==>
+
+Program(Shebang,ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(StringLiteral))))
+
+
+# A backslash joins a line to the next
+
+def message = 'a' + \
+    'b'
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,BinaryExpression(StringLiteral,ArithOp,StringLiteral))))
+
+
+# A slashy string at the start of a line starts a statement
+
+def half = total
+    / 2
+/a+b/.matcher(text)
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,BinaryExpression(Identifier,ArithOp,IntegerLiteral))),ExpressionStatement(MethodInvocation(SlashyString,MethodName(Identifier),ArgumentList(Identifier))))

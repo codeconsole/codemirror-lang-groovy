@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>codemirror-lang-groovy demo</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f7f9; --panel: #fff; --text: #1f2328; --muted: #59636e; --border: #d1d9e0; }
+  :root[data-theme="dark"] { --bg: #16181c; --panel: #1f2227; --text: #e6e6e6; --muted: #9aa4af; --border: #30363d; }
+  body { margin: 0; font: 14px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 24px; padding: 16px 20px 8px; }
+  h1 { font-size: 18px; margin: 0; }
+  header p { margin: 0; color: var(--muted); }
+  header label { margin-left: auto; color: var(--muted); }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 8px 20px 20px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; min-width: 0; }
+  section h2 { font-size: 13px; font-weight: 600; margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  section h2 span { font-weight: 400; color: var(--muted); }
+  .cm-editor { height: 640px; font-size: 13px; }
+  .status { padding: 6px 12px; border-top: 1px solid var(--border); color: var(--muted); font: 12px ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "@codemirror/state": "../node_modules/@codemirror/state/dist/index.js",
+    "@codemirror/view": "../node_modules/@codemirror/view/dist/index.js",
+    "@codemirror/commands": "../node_modules/@codemirror/commands/dist/index.js",
+    "@codemirror/language": "../node_modules/@codemirror/language/dist/index.js",
+    "@codemirror/streamparser": "../node_modules/@codemirror/streamparser/dist/index.js",
+    "@codemirror/theme-one-dark": "../node_modules/@codemirror/theme-one-dark/dist/index.js",
+    "@codemirror/legacy-modes/mode/groovy": "../node_modules/@codemirror/legacy-modes/mode/groovy.js",
+    "@lezer/common": "../node_modules/@lezer/common/dist/index.js",
+    "@lezer/highlight": "../node_modules/@lezer/highlight/dist/index.js",
+    "@lezer/lr": "../node_modules/@lezer/lr/dist/index.js",
+    "@marijn/find-cluster-break": "../node_modules/@marijn/find-cluster-break/src/index.js",
+    "style-mod": "../node_modules/style-mod/src/style-mod.js",
+    "crelt": "../node_modules/crelt/index.js",
+    "w3c-keyname": "../node_modules/w3c-keyname/index.js",
+    "codemirror-lang-groovy": "../dist/index.js"
+  }
+}
+</script>
+</head>
+<body>
+<header>
+  <h1>codemirror-lang-groovy</h1>
+  <p>The Lezer grammar (right) next to the legacy stream mode (left). Run <code>npm run build</code> first.</p>
+  <label><input type="checkbox" id="dark"> Dark theme</label>
+</header>
+<main>
+  <section><h2>Legacy mode <span>@codemirror/legacy-modes/mode/groovy</span></h2><div id="legacy"></div><div class="status">No syntax tree: tokens only</div></section>
+  <section><h2>Lezer grammar <span>codemirror-lang-groovy</span></h2><div id="lezer"></div><div class="status" id="status"></div></section>
+</main>
+<script type="module">
+import {EditorState, Compartment} from "@codemirror/state"
+import {EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter} from "@codemirror/view"
+import {defaultKeymap, history, historyKeymap, indentWithTab} from "@codemirror/commands"
+import {StreamLanguage, bracketMatching, foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle, syntaxTree} from "@codemirror/language"
+import {groovy as legacyGroovy} from "@codemirror/legacy-modes/mode/groovy"
+import {oneDark} from "@codemirror/theme-one-dark"
+import {groovy} from "codemirror-lang-groovy"
+
+const doc = `import groovy.json.JsonSlurper
+
+// The kind of script people run in the Grails console
+def books = Book.list(max: 10, sort: 'title')
+println "Found \${books.size()} books, first: $books.first().title"
+
+books.findAll { it.price > 20 }
+     .collect { book -> [title: book.title, total: book.price * 1.2G] }
+     .each { println it }
+
+def json = new JsonSlurper().parseText('{"name": "Ann"}')
+assert json.name == 'Ann' : "unexpected \${json}"
+
+def pattern = /\\d{4}-\\d{2}/
+def path = $/C:\\temp\\$name/$
+if ('2026-11' ==~ pattern) log.info "matched", path
+
+class Book {
+    String title
+    BigDecimal price
+    static belongsTo = [author: Author]
+
+    static constraints = {
+        title blank: false, maxSize: 200
+        price min: 0.0G
+    }
+
+    String toString() { "$title ($price)" }
+}
+
+enum Format {
+    HARDCOVER('hc'),
+    EBOOK('eb')
+
+    final String code
+    Format(String code) { this.code = code }
+}
+
+def size = switch (books.size()) {
+    case 0 -> 'none'
+    case 1..9 -> 'few'
+    default -> 'many'
+}
+render view: 'index', model: [books: books, size: size]
+`
+
+const darkToggle = document.getElementById("dark"), themes = []
+function themeFor(dark) { return dark ? oneDark : [] }
+function editor(parent, language) {
+  let theme = new Compartment()
+  themes.push(theme)
+  return new EditorView({
+    parent,
+    state: EditorState.create({
+      doc,
+      extensions: [
+        lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), history(), foldGutter(),
+        bracketMatching(), indentOnInput(), syntaxHighlighting(defaultHighlightStyle, {fallback: true}),
+        language, keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        theme.of(themeFor(darkToggle.checked)),
+        EditorView.updateListener.of(update => { if (parent.id == "lezer") showStatus(update.view) })
+      ]
+    })
+  })
+}
+
+function showStatus(view) {
+  let tree = syntaxTree(view.state), errors = 0, path = []
+  tree.iterate({enter(node) { if (node.type.isError) errors++ }})
+  for (let node = tree.resolveInner(view.state.selection.main.head, -1); node; node = node.parent)
+    if (!node.type.isAnonymous) path.unshift(node.name)
+  document.getElementById("status").textContent = `${errors} parse errors · ${path.join(" › ")}`
+}
+
+const views = [
+  editor(document.getElementById("legacy"), StreamLanguage.define(legacyGroovy)),
+  editor(document.getElementById("lezer"), groovy())
+]
+darkToggle.addEventListener("change", () => {
+  document.documentElement.dataset.theme = darkToggle.checked ? "dark" : "light"
+  views.forEach((view, i) => view.dispatch({effects: themes[i].reconfigure(themeFor(darkToggle.checked))}))
+})
+showStatus(views[1])
+window.views = views
+</script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+# A call without parentheses
+
+println "hello"
+println x
+sleep 1000
+
+==>
+
+Program(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(GString))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(IntegerLiteral))))
+
+
+# Named arguments in a command call
+
+render view: 'show', model: [book: book]
+name nullable: false, blank: false
+
+==>
+
+Program(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(NamedArgument(PropertyName,StringLiteral),NamedArgument(PropertyName,MapExpression(MapEntry(PropertyName,Identifier)))))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(NamedArgument(PropertyName,BooleanLiteral),NamedArgument(PropertyName,BooleanLiteral)))))
+
+
+# A declaration is not a command call
+
+String name
+def x = 1
+foo bar = 2
+
+==>
+
+Program(LocalVariableDeclaration(TypeName,VariableDeclarator(Definition)),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,IntegerLiteral)),LocalVariableDeclaration(TypeName,VariableDeclarator(Definition,AssignOp,IntegerLiteral)))
+
+
+# A command call through properties
+
+log.info "starting"
+this.println x
+
+==>
+
+Program(ExpressionStatement(CommandExpression(Identifier,MethodName(Identifier),CommandArguments(GString))),ExpressionStatement(CommandExpression(this,MethodName(Identifier),CommandArguments(Identifier))))
+
+
+# A command call after a call or an index
+
+e.message.normalize().contains "Invalid"
+members.member[0].containsKey 'id'
+new Author(name: 'Bob').save flush: true
+
+==>
+
+Program(ExpressionStatement(CommandExpression(MethodInvocation(FieldAccess(Identifier,PropertyName),MethodName(Identifier),ArgumentList),MethodName(Identifier),CommandArguments(GString))),ExpressionStatement(CommandExpression(ArrayAccess(FieldAccess(Identifier,PropertyName),IntegerLiteral),MethodName(Identifier),CommandArguments(StringLiteral))),ExpressionStatement(CommandExpression(ObjectCreationExpression(new,TypeName,ArgumentList(NamedArgument(PropertyName,StringLiteral))),MethodName(Identifier),CommandArguments(NamedArgument(PropertyName,BooleanLiteral)))))
+
+
+# A capitalized property in a constraint
+
+SKU nullable: true, unique: true
+
+==>
+
+Program(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(NamedArgument(PropertyName,BooleanLiteral),NamedArgument(PropertyName,BooleanLiteral)))))
+
+
+# A string argument right after the name
+
+render"sum: $sum"
+
+==>
+
+Program(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(GString(InterpolatedVariable)))))
+
+
+# Command chains
+
+id 'org.example' version '1.0' apply false
+substitute module('a:b') using project(':b')
+take 2.pills of chloroquine after 6.hours
+
+==>
+
+Program(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(StringLiteral),CommandChain(MethodName(Identifier),CommandArguments(StringLiteral)),CommandChain(MethodName(Identifier),CommandArguments(BooleanLiteral)))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(MethodInvocation(MethodName(Identifier),ArgumentList(StringLiteral))),CommandChain(MethodName(Identifier),CommandArguments(MethodInvocation(MethodName(Identifier),ArgumentList(StringLiteral)))))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(FieldAccess(IntegerLiteral,PropertyName)),CommandChain(MethodName(Identifier),CommandArguments(Identifier)),CommandChain(MethodName(Identifier),CommandArguments(FieldAccess(IntegerLiteral,PropertyName))))))
+
+
+# A command call on the right of an assignment
+
+def total = sum 1, 2
+result = compute x
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,CommandExpression(MethodName(Identifier),CommandArguments(IntegerLiteral,IntegerLiteral)))),ExpressionStatement(AssignmentExpression(Identifier,AssignOp,CommandExpression(MethodName(Identifier),CommandArguments(Identifier)))))
+
+
+# Operators are not command arguments
+
+a - b
+a -b
+foo [1, 2]
+x instanceof Map
+item in list
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier,ArithOp,Identifier)),ExpressionStatement(BinaryExpression(Identifier,ArithOp,Identifier)),ExpressionStatement(ArrayAccess(Identifier,IntegerLiteral,IntegerLiteral)),ExpressionStatement(InstanceofExpression(Identifier,instanceof,TypeName)),ExpressionStatement(BinaryExpression(Identifier,in,Identifier)))
+
+
+# A closure argument is an ordinary call
+
+task hello {
+  doLast { println 'hi' }
+}
+
+==>
+
+Program(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(MethodInvocation(MethodName(Identifier),Closure(ExpressionStatement(MethodInvocation(MethodName(Identifier),Closure(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(StringLiteral))))))))))))
+
+
+# A string names a command call with named arguments
+
+'*' nullable: true
+"/" resources: "book"
+
+==>
+
+Program(ExpressionStatement(CommandExpression(StringLiteral,CommandArguments(NamedArgument(PropertyName,BooleanLiteral)))),ExpressionStatement(CommandExpression(GString,CommandArguments(NamedArgument(PropertyName,GString)))))
+
+
+# A command call on a parenthesized expression
+
+((Validator) validator).validate target, errors
+
+==>
+
+Program(ExpressionStatement(CommandExpression(ParenthesizedExpression(CastExpression(TypeName,Identifier)),MethodName(Identifier),CommandArguments(Identifier,Identifier))))

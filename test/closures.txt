@@ -1,0 +1,79 @@
+# Closures with and without parameters
+
+def add = { a, b -> a + b }
+def twice = { it * 2 }
+def nothing = { -> }
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,Closure(ClosureParameters(FormalParameter(Definition),FormalParameter(Definition)),ExpressionStatement(BinaryExpression(Identifier,ArithOp,Identifier))))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,Closure(ExpressionStatement(BinaryExpression(Identifier,ArithOp,IntegerLiteral))))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,Closure)))
+
+
+# Typed parameters and default values
+
+def greet = { String name, int times = 1 -> name * times }
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,Closure(ClosureParameters(FormalParameter(TypeName,Definition),FormalParameter(PrimitiveType,Definition,AssignOp,IntegerLiteral)),ExpressionStatement(BinaryExpression(Identifier,ArithOp,Identifier))))))
+
+
+# A closure passed to a call
+
+list.each { println it }
+list.inject(0) { sum, x -> sum + x }
+withTransaction { status -> save() }
+
+==>
+
+Program(ExpressionStatement(MethodInvocation(Identifier,MethodName(Identifier),Closure(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(Identifier)))))),ExpressionStatement(MethodInvocation(Identifier,MethodName(Identifier),ArgumentList(IntegerLiteral),Closure(ClosureParameters(FormalParameter(Definition),FormalParameter(Definition)),ExpressionStatement(BinaryExpression(Identifier,ArithOp,Identifier))))),ExpressionStatement(MethodInvocation(MethodName(Identifier),Closure(ClosureParameters(FormalParameter(Definition)),ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList))))))
+
+
+# A closure on the line after a call
+
+foo()
+{ bar() }
+
+==>
+
+Program(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList,Closure(ExpressionStatement(MethodInvocation(MethodName(Identifier),ArgumentList))))))
+
+
+# A closure at the start of a statement
+
+{ -> resource } as PrivilegedAction
+
+==>
+
+Program(ExpressionStatement(AsExpression(Closure(ExpressionStatement(Identifier)),as,TypeName)))
+
+
+# A closure called directly
+
+def r = { 42 }()
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,MethodInvocation(Closure(ExpressionStatement(IntegerLiteral)),ArgumentList))))
+
+
+# Nested closures
+
+static constraints = {
+  name blank: false
+  email email: true, validator: { val, obj -> val != obj.name }
+}
+
+==>
+
+Program(LocalVariableDeclaration(Modifiers(static),VariableDeclarator(Definition,AssignOp,Closure(ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(NamedArgument(PropertyName,BooleanLiteral)))),ExpressionStatement(CommandExpression(MethodName(Identifier),CommandArguments(NamedArgument(PropertyName,BooleanLiteral),NamedArgument(PropertyName,Closure(ClosureParameters(FormalParameter(Definition),FormalParameter(Definition)),ExpressionStatement(BinaryExpression(Identifier,CompareOp,FieldAccess(Identifier,PropertyName))))))))))))
+
+
+# Java lambdas
+
+def f = x -> x * 2
+def g = (a, b) -> { a + b }
+
+==>
+
+Program(LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,LambdaExpression(Definition,BinaryExpression(Identifier,ArithOp,IntegerLiteral)))),LocalVariableDeclaration(def,VariableDeclarator(Definition,AssignOp,LambdaExpression(FormalParameters(FormalParameter(Definition),FormalParameter(Definition)),Block(ExpressionStatement(BinaryExpression(Identifier,ArithOp,Identifier)))))))
