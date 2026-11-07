@@ -35,6 +35,14 @@ It depends only on `@codemirror/language`, `@lezer/lr`, `@lezer/highlight` and
 `@lezer/common`. When loading CodeMirror through an import map, map
 `codemirror-lang-groovy` to `dist/index.js` alongside those modules.
 
+Java and Grails applications can take it from Maven Central as a WebJar,
+`org.webjars.npm:codemirror-lang-groovy`, which serves the bundle at
+`/webjars/codemirror-lang-groovy/<version>/dist/index.js`:
+
+```groovy
+runtimeOnly "org.webjars.npm:codemirror-lang-groovy:0.1.1"
+```
+
 ## What it parses
 
 The grammar starts from `@lezer/java` and adds the parts of Groovy that Java
@@ -102,9 +110,30 @@ node scripts/parse.js 'println "hi"'
 serve the repository root (for example `python3 -m http.server`) and open
 `/demo/`.
 
+`.github/workflows/test.yml` runs the tests on Node 22 and 24 for every push
+to `main` and every pull request.
+
 Test cases live in `test/*.txt` in Lezer's test format.
 `node scripts/fill-tests.js test/<file>.txt` fills in the expected trees from
 the current parser; review every changed tree before committing it.
+
+## Releasing
+
+1. Update `version` in `package.json` and add a `CHANGELOG.md` entry, then
+   commit.
+2. Tag the commit with that version and push the tag:
+   `git tag v0.2.0 && git push origin v0.2.0`.
+
+`.github/workflows/release.yml` checks that the tag matches `package.json`,
+runs the tests, publishes to npm, and then has webjars.org deploy the WebJar
+to Maven Central, where it can take an hour to appear.
+
+Publishing uses npm's trusted publishing, so no npm token is stored in the
+repository. It needs one setting on npmjs.com: in the package's Settings,
+under Trusted publishing, add GitHub Actions with user `codeconsole`,
+repository `codemirror-lang-groovy` and workflow `release.yml`. npm drops a
+trusted publisher that has not published within two days of being added, so
+add it shortly before tagging the first release that uses it.
 
 ## License
 

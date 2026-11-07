@@ -1,0 +1,56 @@
+name: Release
+
+# Pushing a tag such as v0.2.0 publishes that version to npm and then has
+# webjars.org deploy it to Maven Central as org.webjars.npm:codemirror-lang-groovy.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # npm trusted publishing authenticates with GitHub's OIDC token
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - name: Use npm 11.5.1 or later, which trusted publishing requires
+        run: npm install -g npm@latest
+      - name: Check that the tag matches package.json
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+      - run: npm ci
+      # Runs the tests first (prepublishOnly). No token: npm accepts the OIDC
+      # identity of this workflow once it is a trusted publisher of the package.
+      - run: npm publish
+
+  webjar:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for the new version on npm
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for i in $(seq 1 40); do
+            if npm view "codemirror-lang-groovy@$version" version >/dev/null 2>&1; then exit 0; fi
+            sleep 15
+          done
+          echo "codemirror-lang-groovy@$version did not appear on npm within 10 minutes"
+          exit 1
+      - name: Deploy the WebJar
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          curl --fail --no-progress-meter -X POST \
+            "https://www.webjars.org/deploy?webJarType=npm&nameOrUrlish=codemirror-lang-groovy&version=$version" \
+            | tee deploy.log
+          grep -q 'Deployed!' deploy.log
