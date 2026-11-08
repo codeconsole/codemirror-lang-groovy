@@ -1,3 +1,10 @@
+## 0.1.2 (2026-11-07)
+
+### Documentation
+
+The README gives the WebJar coordinates, `org.webjars.npm:codemirror-lang-groovy`,
+for Java and Grails applications, and describes how releases are made.
+
 ## 0.1.1 (2026-11-07)
 
 ### New features

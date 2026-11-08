@@ -1,6 +1,6 @@
 {
   "name": "codemirror-lang-groovy",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Groovy language support for CodeMirror 6, built on a Lezer grammar",
   "keywords": [
     "codemirror",
