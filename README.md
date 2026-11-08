@@ -123,17 +123,19 @@ the current parser; review every changed tree before committing it.
    commit.
 2. Tag the commit with that version and push the tag:
    `git tag v0.2.0 && git push origin v0.2.0`.
+3. Approve the staged version on npmjs.com, or with
+   `npm stage approve <stage-id>`. npm asks for your second factor.
 
 `.github/workflows/release.yml` checks that the tag matches `package.json`,
-runs the tests, publishes to npm, and then has webjars.org deploy the WebJar
-to Maven Central, where it can take an hour to appear.
+runs the tests and stages the version on npm. Nothing is installable until
+you approve it. Once you do, the workflow has webjars.org deploy the WebJar
+to Maven Central, where it can take an hour to appear. The workflow waits up
+to five hours for the approval; after that, re-run its `webjar` job.
 
 Publishing uses npm's trusted publishing, so no npm token is stored in the
-repository. It needs one setting on npmjs.com: in the package's Settings,
-under Trusted publishing, add GitHub Actions with user `codeconsole`,
-repository `codemirror-lang-groovy` and workflow `release.yml`. npm drops a
-trusted publisher that has not published within two days of being added, so
-add it shortly before tagging the first release that uses it.
+repository. The package's trusted publisher on npmjs.com is GitHub Actions,
+user `codeconsole`, repository `codemirror-lang-groovy`, workflow
+`release.yml`, allowed to stage releases only.
 
 ## License
 
